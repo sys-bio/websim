@@ -271,7 +271,7 @@ struct MyApp {
     phase_x: usize,
     phase_y: usize,
     dark_mode: bool,
-    /// The outcome of the last CSV export: Ok(where it went) or Err(what went wrong).
+    /// The outcome of the last CSV export or copy: Ok(what happened) or Err(what went wrong).
     export_message: Option<Result<String, String>>,
 }
 
@@ -311,6 +311,10 @@ impl eframe::App for MyApp {
                 ui.menu_button("File", |ui| {
                     if ui.button("Export results as CSV…").clicked() {
                         self.export_csv();
+                        ui.close();
+                    }
+                    if ui.button("Copy results as CSV").clicked() {
+                        self.copy_csv(&ctx);
                         ui.close();
                     }
                     if ui.button("Reset").clicked() {
@@ -363,6 +367,20 @@ impl MyApp {
             Ok(None) => None, // cancelled
             Err(e) => Some(Err(e)),
         };
+    }
+
+    /// Put the current results on the clipboard as CSV, ready to paste elsewhere.
+    fn copy_csv(&mut self, ctx: &egui::Context) {
+        if self.results.t.is_empty() {
+            self.export_message = Some(Err("There are no results to copy yet.".to_owned()));
+            return;
+        }
+        ctx.copy_text(self.results.to_csv());
+        self.export_message = Some(Ok(format!(
+            "Copied {} rows × {} columns to the clipboard",
+            self.results.t.len(),
+            self.results.names.len() + 1
+        )));
     }
 
     fn load_example(&mut self, text: &str) {
@@ -460,6 +478,7 @@ impl MyApp {
         }
         let res = &self.results;
         let mut export_clicked = false;
+        let mut copy_clicked = false;
 
         if let Some(reason) = &res.stopped_early {
             ui.colored_label(ui.visuals().warn_fg_color, reason);
@@ -503,6 +522,10 @@ impl MyApp {
                     .button("Export CSV")
                     .on_hover_text("Save every species and rate over time as a CSV file")
                     .clicked();
+                copy_clicked = ui
+                    .button("Copy CSV")
+                    .on_hover_text("Copy every species and rate over time to the clipboard, as CSV")
+                    .clicked();
                 let events = match res.events.len() {
                     0 => String::new(),
                     1 => ", 1 event".to_owned(),
@@ -524,6 +547,11 @@ impl MyApp {
         // Exporting needs `&mut self`, so it waits until the toolbar has finished using `res`.
         if export_clicked {
             self.export_csv();
+        }
+        if copy_clicked {
+            self.copy_csv(ui.ctx());
+        }
+        if export_clicked || copy_clicked {
             ui.ctx().request_repaint(); // show the outcome straight away
         }
         let res = &self.results;
