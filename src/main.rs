@@ -2,6 +2,7 @@
 #![windows_subsystem = "windows"]
 
 mod antimony;
+mod export;
 mod model;
 mod ode;
 mod solvers;
@@ -270,6 +271,8 @@ struct MyApp {
     phase_x: usize,
     phase_y: usize,
     dark_mode: bool,
+    /// The outcome of the last CSV export: Ok(where it went) or Err(what went wrong).
+    export_message: Option<Result<String, String>>,
 }
 
 impl Default for MyApp {
@@ -289,6 +292,7 @@ impl Default for MyApp {
             phase_x: 0,
             phase_y: 1,
             dark_mode: true,
+            export_message: None,
         }
     }
 }
@@ -305,6 +309,10 @@ impl eframe::App for MyApp {
         egui::Panel::top("menu_bar").show(ui, |ui| {
             egui::MenuBar::new().ui(ui, |ui| {
                 ui.menu_button("File", |ui| {
+                    if ui.button("Export results as CSV…").clicked() {
+                        self.export_csv();
+                        ui.close();
+                    }
                     if ui.button("Reset").clicked() {
                         *self = MyApp::default();
                         ui.close();
@@ -341,6 +349,20 @@ impl MyApp {
             }
             Err(e) => self.parse_error = Some(e.to_string()),
         }
+    }
+
+    /// Save the current results (every species and rate) as a CSV file.
+    fn export_csv(&mut self) {
+        if self.results.t.is_empty() {
+            self.export_message = Some(Err("There are no results to export yet.".to_owned()));
+            return;
+        }
+        let csv = self.results.to_csv();
+        self.export_message = match export::save_text_file("simulation.csv", &csv) {
+            Ok(Some(place)) => Some(Ok(format!("Saved {place}"))),
+            Ok(None) => None, // cancelled
+            Err(e) => Some(Err(e)),
+        };
     }
 
     fn load_example(&mut self, text: &str) {
@@ -434,8 +456,10 @@ impl MyApp {
         if !up_to_date {
             self.results = model.run(self.t_end, &self.solver);
             self.solved_for = Some((model.clone(), self.t_end, self.solver));
+            self.export_message = None; // it described the previous results
         }
         let res = &self.results;
+        let mut export_clicked = false;
 
         if let Some(reason) = &res.stopped_early {
             ui.colored_label(ui.visuals().warn_fg_color, reason);
@@ -473,7 +497,12 @@ impl MyApp {
                 ui.label("to");
                 ui.add(egui::DragValue::new(high).speed(speed));
             }
+            // Right to left: the first thing added sits at the far right.
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                export_clicked = ui
+                    .button("Export CSV")
+                    .on_hover_text("Save every species and rate over time as a CSV file")
+                    .clicked();
                 let events = match res.events.len() {
                     0 => String::new(),
                     1 => ", 1 event".to_owned(),
@@ -485,6 +514,19 @@ impl MyApp {
                 ));
             });
         });
+
+        if let Some(message) = &self.export_message {
+            match message {
+                Ok(text) => ui.small(text),
+                Err(text) => ui.colored_label(ui.visuals().error_fg_color, text),
+            };
+        }
+        // Exporting needs `&mut self`, so it waits until the toolbar has finished using `res`.
+        if export_clicked {
+            self.export_csv();
+            ui.ctx().request_repaint(); // show the outcome straight away
+        }
+        let res = &self.results;
 
         let n = res.names.len();
         let show_phase_plane = n >= 2;

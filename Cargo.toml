@@ -10,4 +10,9 @@ egui_plot = "0.37.0"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.3", features = ["wasm_js"] }
+js-sys = "0.3"
 wasm-bindgen-futures = "0.4.79"
+web-sys = { version = "0.3", features = ["Blob", "BlobPropertyBag", "Url", "HtmlAnchorElement", "Document", "Element", "Window"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+rfd = "0.17.2"

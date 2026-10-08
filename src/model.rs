@@ -659,6 +659,27 @@ impl Results {
     pub fn series(&self, index: usize) -> Vec<[f64; 2]> {
         self.t.iter().zip(&self.columns[index]).map(|(t, v)| [*t, *v]).collect()
     }
+
+    /// The results as CSV: a header row (`time`, then every species and rate),
+    /// then one row per time point. Numbers are written with full precision.
+    /// At an event the time appears twice: the values just before, then just after.
+    pub fn to_csv(&self) -> String {
+        let mut csv = String::from("time");
+        for name in &self.names {
+            csv.push(',');
+            csv.push_str(name);
+        }
+        csv.push('\n');
+        for (i, t) in self.t.iter().enumerate() {
+            csv.push_str(&t.to_string());
+            for column in &self.columns {
+                csv.push(',');
+                csv.push_str(&column[i].to_string());
+            }
+            csv.push('\n');
+        }
+        csv
+    }
 }
 
 fn error(line: usize, message: String) -> ParseError {
@@ -1348,6 +1369,23 @@ mod tests {
             let flux = *column.last().unwrap();
             assert!((flux - 5.0).abs() < 1e-6, "{name} = {flux}");
         }
+    }
+
+    #[test]
+    fn results_export_as_csv() {
+        let model = Model::parse("J1: S -> ; k*S\nk = 0.5; S = 2").unwrap();
+        let settings = SolverSettings { output_points: 4, ..Default::default() };
+        let csv = model.run(1.0, &settings).to_csv();
+        let lines: Vec<&str> = csv.lines().collect();
+        assert_eq!(lines[0], "time,S,J1");
+        assert_eq!(lines[1], "0,2,1");
+        assert_eq!(lines.len(), 1 + 5, "header + t = 0, 0.25, 0.5, 0.75, 1");
+
+        // Every value reads back as the number that was written.
+        let last: Vec<f64> = lines[5].split(',').map(|v| v.parse().unwrap()).collect();
+        assert_eq!(last[0], 1.0);
+        assert!((last[1] - 2.0 * (-0.5f64).exp()).abs() < 1e-5, "S(1) = {}", last[1]);
+        assert!((last[2] - 0.5 * last[1]).abs() < 1e-12, "J1 = k*S");
     }
 
     /// The adaptive solvers report the requested number of evenly spaced points.
