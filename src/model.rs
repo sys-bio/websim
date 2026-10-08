@@ -1350,6 +1350,19 @@ mod tests {
         }
     }
 
+    /// The adaptive solvers report the requested number of evenly spaced points.
+    #[test]
+    fn output_points_setting_controls_resolution() {
+        let (_, text) = EXAMPLES.iter().find(|(name, _)| name.starts_with("Lorenz")).unwrap();
+        let model = Model::parse(text).unwrap();
+        for points in [100, 20_000] {
+            let settings = SolverSettings { output_points: points, ..Default::default() };
+            let sol = model.simulate(50.0, &settings);
+            assert_eq!(sol.t.len(), points + 1, "including t = 0");
+            assert!((sol.t[1] - 50.0 / points as f64).abs() < 1e-12);
+        }
+    }
+
     #[test]
     fn every_example_parses_and_simulates() {
         for (name, text) in EXAMPLES {

@@ -44,8 +44,11 @@ pub struct SolverSettings {
     /// Relative and absolute error tolerances for the adaptive solvers.
     pub rtol: f64,
     pub atol: f64,
-    /// Number of steps for the fixed-step RK4 solver.
+    /// Number of steps for the fixed-step RK4 solver, which records every step.
     pub rk4_steps: usize,
+    /// How many evenly spaced points the adaptive solvers report over the whole run.
+    /// This only affects how smooth the plots are, not the solver's accuracy.
+    pub output_points: usize,
 }
 
 impl Default for SolverSettings {
@@ -55,6 +58,7 @@ impl Default for SolverSettings {
             rtol: 1e-6,
             atol: 1e-8,
             rk4_steps: 5000,
+            output_points: 5000,
         }
     }
 }
@@ -70,9 +74,6 @@ impl SolverSettings {
         }
     }
 }
-
-/// How many evenly spaced points the adaptive solvers report over the whole run, for plotting.
-const OUTPUT_POINTS: usize = 2000;
 
 /// Give up after this many steps in a run, so a hard problem can't freeze the UI.
 const MAX_STEPS: usize = 100_000;
@@ -142,7 +143,13 @@ pub fn solve_segment(
         Err(e) => return SegmentEnd::Failed(format!("Couldn't set up the solver: {e}")),
     };
 
-    let run = Run { t0, t_end, solution, check_events };
+    let run = Run {
+        t0,
+        t_end,
+        points: settings.output_points.max(1),
+        solution,
+        check_events,
+    };
     match settings.method {
         Method::Bdf => match problem.bdf::<NalgebraLU<f64>>() {
             Ok(solver) => run.integrate(solver),
@@ -164,6 +171,8 @@ pub fn solve_segment(
 struct Run<'s, 'c> {
     t0: f64,
     t_end: f64,
+    /// Number of intervals in the output grid over the whole run.
+    points: usize,
     solution: &'s mut Solution,
     check_events: &'s mut EventCheck<'c>,
 }
@@ -176,14 +185,14 @@ impl Run<'_, '_> {
         Eqn: OdeEquations<T = f64> + 'a,
         S: OdeSolverMethod<'a, Eqn>,
     {
-        let Run { t0, t_end, solution, check_events } = self;
+        let Run { t0, t_end, points, solution, check_events } = self;
         if let Err(e) = solver.set_stop_time(t_end) {
             return SegmentEnd::Failed(format!("Couldn't set the end time: {e}"));
         }
 
-        // The output grid is t_end·k/OUTPUT_POINTS; start at the first point after t0.
-        let grid = |k: usize| t_end * k as f64 / OUTPUT_POINTS as f64;
-        let mut next = ((t0 / t_end) * OUTPUT_POINTS as f64).floor() as usize + 1;
+        // The output grid is t_end·k/points; start at the first point after t0.
+        let grid = |k: usize| t_end * k as f64 / points as f64;
+        let mut next = ((t0 / t_end) * points as f64).floor() as usize + 1;
 
         let mut t_prev = t0;
         loop {
@@ -211,7 +220,7 @@ impl Run<'_, '_> {
             // Record output up to the event, if one fires in this step, else up to t_now.
             let event = check_events(t_prev, t_now, &y_at);
             let record_until = event.unwrap_or(t_now);
-            while next <= OUTPUT_POINTS && grid(next) <= record_until {
+            while next <= points && grid(next) <= record_until {
                 let t = grid(next);
                 if event.is_some() && t == record_until {
                     break; // the event time itself is recorded by the caller

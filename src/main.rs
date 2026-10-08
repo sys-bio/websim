@@ -197,6 +197,10 @@ fn solver_controls(ui: &mut egui::Ui, label_width: f32, settings: &mut SolverSet
     if settings.method.is_adaptive() {
         tolerance_slider(ui, label_width, "rel. tol", &mut settings.rtol);
         tolerance_slider(ui, label_width, "abs. tol", &mut settings.atol);
+        labeled_row(ui, label_width, "points", |ui| {
+            ui.add(egui::Slider::new(&mut settings.output_points, 100..=100_000).logarithmic(true))
+                .on_hover_text("Output points for the plots: more gives smoother curves");
+        });
     } else {
         labeled_row(ui, label_width, "steps", |ui| {
             ui.add(egui::Slider::new(&mut settings.rk4_steps, 100..=200_000).logarithmic(true));
@@ -387,7 +391,7 @@ impl MyApp {
             let Some(model) = &mut self.model else { return };
 
             let end_time = "end time";
-            let other_labels = [end_time, "solver", "rel. tol", "abs. tol", "steps"];
+            let other_labels = [end_time, "solver", "rel. tol", "abs. tol", "points", "steps"];
             let label_width =
                 label_column_width(ui, model.symbols().map(|s| s.name.as_str()).chain(other_labels));
 
