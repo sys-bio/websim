@@ -13,7 +13,16 @@ with steady states, conservation analysis or continuation.
 ## Layout
 
 - `src/` — the egui app: `main.rs` (UI), `export.rs` (save a file: a Save
-  dialog on the desktop, a download in the browser).
+  dialog on the desktop, a download in the browser), `bifurcation.rs` (the
+  Bifurcation view: one-parameter equilibrium branches from `bifurcata`, grown
+  a few steps per frame, stable solid / unstable dashed, LP/BP/H marked).
+- `bifurcata` is a git dependency (feature `antimony`). That feature reaches
+  `websim-model` through a git dependency on this repository, so `Cargo.toml`
+  `[patch]`es it back to `crates/model`: one copy of the model types. To build
+  against a local, unpushed bifurcata, add
+  `--config 'patch."https://github.com/sys-bio/bifurcata-rs".bifurcata.path="../bifurcata-rs"'`
+  (Trunk takes no `--config`: put the same patch in `.cargo/config.toml`
+  temporarily, and never commit it).
 - `crates/model/` — `websim-model`, the model layer with no UI code:
   - `antimony.rs` — the Antimony-subset front end (reactions, rules, rate
     rules, events, `/* */` comments); also returns the stoichiometry.
@@ -69,6 +78,9 @@ Pushing to `main` deploys the site; check the Actions run, then the page.
   strip `'\u{feff}'` first.
 - **Editing files with non-ASCII text** (α, –, ×): use the Edit tool, not
   shell `sed`/Python, which have mangled or truncated files here before.
+- **Line endings are LF.** Python on Windows writes CRLF in text mode; a
+  Python edit turned a 32-line change to `main.rs` into a 1,556-line diff.
+  Write bytes, or check `git diff --stat` before committing.
 - **Slider number boxes** reserve a fixed width (`slider_value_room`): a row
   sized from the current value made the side panel grow without end.
 - **Finite-difference rate-law derivatives**, not symbolic: symbolic
@@ -102,5 +114,8 @@ All found while matching the Delphi baselines; the plan, §5.4, has more.
 
 See the milestone table in `docs/bifurcation-rust-plan.md` (§8). In short:
 **M0 done** (conservation analysis, steady states; October 2026). **M1 done**
-in bifurcata-rs (foundations, Stage 0 ported). Next is **M2** there: Newton,
-the continuation engine, equilibria and fold/branch-point/Hopf detection.
+in bifurcata-rs (foundations, Stage 0 ported). **M2 done** there (equilibrium
+continuation with fold/branch-point/Hopf detection, all baselines matched).
+A first **Bifurcation view** is in the app (an early piece of M5: one
+parameter, both directions from the steady state). Next is **M3** in
+bifurcata-rs: normal forms and branch switching.

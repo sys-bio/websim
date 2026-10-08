@@ -8,8 +8,15 @@ members = ["crates/model"]
 
 [dependencies]
 websim-model = { path = "crates/model" }
+# Bifurcation analysis. Its `antimony` feature reaches websim-model through a
+# git dependency on this repository; the [patch] below points that at the local
+# crate, so the app and bifurcata share one copy of the model types.
+bifurcata = { git = "https://github.com/sys-bio/bifurcata-rs", features = ["antimony"] }
 eframe = "0.36"
 egui_plot = "0.37.0"
+
+[patch."https://github.com/sys-bio/websim"]
+websim-model = { path = "crates/model" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 js-sys = "0.3"

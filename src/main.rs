@@ -1,6 +1,7 @@
 // Don't open a console window on Windows (debug and release builds).
 #![windows_subsystem = "windows"]
 
+mod bifurcation;
 mod export;
 
 use std::collections::HashMap;
@@ -360,6 +361,17 @@ struct MyApp {
     export_message: Option<Result<String, String>>,
     /// The last steady state, with the model (and so the values) it was found for.
     steady: Option<(Model, Result<SteadyState, String>)>,
+    /// Which view the central panel shows.
+    view: View,
+    bifurcation: bifurcation::BifurcationView,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum View {
+    /// The time course and phase plane.
+    Simulation,
+    /// Equilibrium branches against a parameter.
+    Bifurcation,
 }
 
 impl Default for MyApp {
@@ -381,6 +393,8 @@ impl Default for MyApp {
             dark_mode: true,
             export_message: None,
             steady: None,
+            view: View::Simulation,
+            bifurcation: bifurcation::BifurcationView::default(),
         }
     }
 }
@@ -424,7 +438,22 @@ impl eframe::App for MyApp {
             .default_size(440.0)
             .show(ui, |ui| self.model_controls(ui));
 
-        egui::CentralPanel::default().show(ui, |ui| self.simulation(ui));
+        egui::CentralPanel::default().show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.selectable_value(&mut self.view, View::Simulation, egui::RichText::new("Time course").strong());
+                ui.selectable_value(&mut self.view, View::Bifurcation, egui::RichText::new("Bifurcation").strong());
+            });
+            ui.separator();
+            match self.view {
+                View::Simulation => self.simulation(ui),
+                View::Bifurcation => match &self.model {
+                    Some(model) => self.bifurcation.ui(ui, model),
+                    None => {
+                        ui.label("Type a model on the left to analyse it.");
+                    }
+                },
+            }
+        });
     }
 }
 
@@ -474,6 +503,7 @@ impl MyApp {
     fn load_example(&mut self, text: &str) {
         self.model_text = text.to_owned();
         self.model = None; // don't carry slider values over from another model
+        self.bifurcation.clear();
         self.reparse();
         self.phase_x = 0;
         self.phase_y = 1;
