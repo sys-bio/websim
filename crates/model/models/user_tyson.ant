@@ -1,0 +1,61 @@
+/*
+[bifurcation]
+parameter: m
+min: 0
+max: 2
+start: 
+ds: 0.001
+dsMax: 0.005
+maxSteps: 10000
+ymin: 
+ymax: 
+*/
+sig:=CycBT+CKIT+Keq^(-1)
+Trimer:=2*CycBT*CKIT/(sig+(sig^2-4*CycBT*CKIT)^0.5)
+CycB:=CycBT-Trimer
+
+-> CKIT; k11-(k12p+k12pp*SK+k12ppp*m*CycB)*CKIT
+-> Cdc20A; k7*IEP*(Cdc20T-Cdc20A)/(J7+Cdc20T-Cdc20A)-k8*Mad*Cdc20A/(J8+Cdc20A)-k6*Cdc20A
+-> Cdc20T; k5p+k5pp*(m*CycB)^n/(J5^n+(m*CycB)^n)-k6*Cdc20T
+-> Cdh1; (k3p+k3pp*Cdc20A)*(1-Cdh1)/(J3+1-Cdh1)-(k4*m*CycB+k4p*SK)*Cdh1/(J4+Cdh1)
+-> CycBT; k1-(k2p+k2pp*Cdh1+k2ppp*Cdc20A)*CycBT
+-> IEP; k9*m*CycB*(1-IEP)-k10*IEP
+-> SK; k13p+k13pp*TF-k14*SK
+-> TF; (k15p*m+k15pp*SK)*(1-TF)/(J15+1-TF)-(k16p+k16pp*m*CycB)*TF/(J16+TF)
+J15=0.01
+J16=0.01
+J3=.04
+J4=.04
+J5=.3
+J7=1e-3
+J8=1e-3
+Keq=1000
+Mad=1
+k1=0.04
+k10=0.02
+k11=1
+k12p=0.2
+k12pp=50
+k12ppp=100
+k13p=0
+k13pp=1
+k14=1
+k15p=1.5
+k15pp=0.05
+k16p=1
+k16pp=3
+k2p=0.04
+k2pp=1
+k2ppp=1
+k3p=1
+k3pp=10
+k4=35
+k4p=2
+k5p=.005
+k5pp=.2
+k6=.1
+k7=1
+k8=0.5
+k9=0.1
+m=1
+n=4

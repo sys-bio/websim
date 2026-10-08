@@ -1,0 +1,42 @@
+/*
+[bifurcation]
+parameter: K
+min: 0.5
+max: 6
+ds: 0.002
+dsMax: 0.02
+maxSteps: 4000
+*/
+
+// ROSENZWEIG-MACARTHUR PREDATOR-PREY - the paradox of enrichment.
+//
+//   Run:  parameter K, range 0.5 : 6, plot N
+//   Then: Curve = Hopf curve, second parameter m
+//
+// Logistic prey with a Holling type II (saturating) predator:
+//
+//   dN/dt = r N (1 - N/K) - a N P / (1 + a h N)
+//   dP/dt = e a N P / (1 + a h N) - m P
+//
+// The interior equilibrium has N* = m / (a (e - m h)), independent of K, so
+// enriching the system - raising the carrying capacity K - does not raise
+// the prey level at all. Past a Hopf point it destabilises it instead, and
+// the system starts to cycle. That is the paradox of enrichment, and it is
+// one of the clearest cases where a bifurcation diagram says something a
+// simulation at one parameter value cannot.
+//
+// Continuing the Hopf point in (K, m) shows where in the plane the cycling
+// regime lives.
+
+-> N; r*N*(1 - N/K) - a*N*P/(1 + a*h*N)
+-> P; e*a*N*P/(1 + a*h*N) - m*P
+
+r = 1
+K = 3
+a = 1
+h = 1
+e = 0.5
+m = 0.2
+
+N = 0.7
+P = 0.5

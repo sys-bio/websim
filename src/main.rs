@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use eframe::egui;
 use egui::{Color32, vec2};
 use egui_plot::{Legend, Line, LineStyle, Plot, Points, VLine};
-use websim_model::model::{EXAMPLES, Model, Results};
+use websim_model::model::{BIFURCATION_EXAMPLES, EXAMPLES, Model, Results};
 use websim_model::solvers::{Method, SolverSettings};
 use websim_model::steady::{Stability, SteadyState, find_steady_state};
 
@@ -525,6 +525,17 @@ impl MyApp {
                             ui.close();
                         }
                     }
+                    ui.separator();
+                    ui.menu_button("Bifurcation examples", |ui| {
+                        for (name, text) in BIFURCATION_EXAMPLES {
+                            if ui.button(*name).on_hover_text("Loads the model with its parameter and range set: press Run").clicked() {
+                                self.load_example(text);
+                                self.bifurcation.apply_spec(text);
+                                self.view = View::Bifurcation;
+                                ui.close();
+                            }
+                        }
+                    });
                 });
             });
 

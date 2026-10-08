@@ -1,0 +1,23 @@
+/*
+[bifurcation]
+parameter: d
+min: 0
+max: 1
+*/
+
+// Parameter = d
+// Range 0 to 1
+// Output = y
+// One Hopf and two LPs
+
+   -> x; r*x*(1-x)-x*y /(x+a) 
+   -> y; -c*y+x*y /(x+a)-d*y^2/(y^2+b^2)
+
+   r = 2
+   a = 0.6
+   b = 0.25
+   c = 0.25
+   d = 0.1
+   
+   x = 1.2
+   y = 1

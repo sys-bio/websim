@@ -10,6 +10,7 @@ use bifurcata::antimony::AntimonyProblem;
 use bifurcata::continuation::{ContinuationEngine, ContinuationOptions};
 use bifurcata::equilibrium::EquilibriumCurve;
 use bifurcata::problem::BifurcationProblem;
+use bifurcata::runspec::RunSpec;
 use bifurcata::types::{BifurcationKind, Branch, StepResult};
 use eframe::egui;
 use egui::Color32;
@@ -69,13 +70,16 @@ pub struct BifurcationView {
     /// The plotted species, by name.
     plotted: Option<String>,
     max_step: f64,
+    /// From the model's `[bifurcation]` block, when it gives them.
+    initial_step: Option<f64>,
+    max_points: Option<usize>,
     run: Option<Run>,
     error: Option<String>,
 }
 
 impl Default for BifurcationView {
     fn default() -> Self {
-        Self { parameter: None, range: (0.0, 1.0), plotted: None, max_step: 0.1, run: None, error: None }
+        Self { parameter: None, range: (0.0, 1.0), plotted: None, max_step: 0.1, initial_step: None, max_points: None, run: None, error: None }
     }
 }
 
@@ -105,6 +109,24 @@ impl BifurcationView {
         *self = Self::default();
     }
 
+    /// Take the parameter, range, step sizes and plotted variable from a
+    /// model's `[bifurcation]` block, where it gives them.
+    pub fn apply_spec(&mut self, model_text: &str) {
+        let spec = RunSpec::parse(model_text);
+        if let Some(p) = spec.parameter {
+            self.parameter = Some(p);
+            self.range = spec.range.unwrap_or((0.0, 1.0));
+        }
+        if let Some(plot) = spec.plot {
+            self.plotted = Some(plot);
+        }
+        if let Some(ds_max) = spec.ds_max {
+            self.max_step = ds_max;
+        }
+        self.initial_step = spec.ds;
+        self.max_points = spec.max_steps;
+    }
+
     fn start(&mut self, model: &Model) {
         self.error = None;
         let problem = AntimonyProblem::new(model.clone());
@@ -126,7 +148,15 @@ impl BifurcationView {
                 return;
             }
         };
-        let options = ContinuationOptions { parameter_min: lo, parameter_max: hi, max_step: self.max_step, ..Default::default() };
+        let defaults = ContinuationOptions::default();
+        let options = ContinuationOptions {
+            parameter_min: lo,
+            parameter_max: hi,
+            max_step: self.max_step,
+            initial_step: self.initial_step.unwrap_or(defaults.initial_step).min(self.max_step),
+            max_points: self.max_points.unwrap_or(defaults.max_points),
+            ..defaults
+        };
         let model_parameters = model.symbols().count() - model.species.len();
         let mut engines = Vec::new();
         // Both directions from the steady state: features lie on both sides of it.
@@ -335,6 +365,44 @@ mod tests {
         J3: X -> ; X
         A = 1; B = 1.2
         X = 1; Y = 1.2";
+
+    /// Every bifurcation example, loaded as the menu loads it, starts from its
+    /// steady state inside its own range and runs to the end of both branches.
+    #[test]
+    fn every_bifurcation_example_runs() {
+        use websim_model::model::BIFURCATION_EXAMPLES;
+        let mut report = Vec::new();
+        let mut failed = false;
+        for (name, text) in BIFURCATION_EXAMPLES {
+            let model = Model::parse(text).unwrap_or_else(|e| panic!("{name}: {e}"));
+            let mut view = BifurcationView::default();
+            view.apply_spec(text);
+            let spec = RunSpec::parse(text);
+            assert!(spec.found && spec.parameter.is_some() && spec.range.is_some(), "{name}: the block gives a parameter and a range");
+            assert!(spec.unknown_keys.is_empty(), "{name}: unknown keys {:?}", spec.unknown_keys);
+            if let Some(plot) = &spec.plot {
+                assert!(model.species_names().contains(plot), "{name}: the block plots {plot}, which is not a species");
+            }
+            view.start(&model);
+            let Some(run) = view.run.as_mut() else {
+                failed = true;
+                report.push(format!("{name}: {}", view.error.clone().unwrap_or_default()));
+                continue;
+            };
+            while run.running() {
+                run.advance(STEPS_PER_FRAME);
+            }
+            let points: usize = run.branches().map(|b| b.points.len()).sum();
+            let found: Vec<String> = run.branches().flat_map(|b| &b.bifurcations).map(|b| format!("{} {:.6}", b.kind.abbreviation(), b.point.lambda[run.active])).collect();
+            let ends: Vec<&str> = run.done.iter().map(|b| b.termination.as_str()).collect();
+            report.push(format!("{name}: {points} points, {ends:?}, [{}]", found.join(", ")));
+        }
+        eprintln!("{}", report.join("
+"));
+        assert!(!failed, "examples that did not start:
+{}", report.join("
+"));
+    }
 
     /// The view's run finds the Brusselator's Hopf at B = 1 + A² = 2, and
     /// drawing it (headless) does not panic.

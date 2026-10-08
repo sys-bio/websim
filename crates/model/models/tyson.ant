@@ -1,0 +1,64 @@
+/*
+[bifurcation]
+parameter: m
+min: 0
+max: 2
+plot: a
+*/
+
+// TYSON-NOVAK CELL CYCLE - several folds and Hopf points on one branch.
+//
+//   da/dt = k5' + k5'' (m x)^n / (J5^n + (m x)^n) - k6 a
+//   dx/dt = k1 - (k2' + k2'' y) x
+//   dy/dt = (k3' + k3'' a)(1 - y)/(J3 + 1 - y) - k4 m x y/(J4 + y)
+//
+//   Run:  parameter m, range 0 : 10, plot a
+//
+// The cell-mass parameter m drives the system through a sequence of
+// bifurcations: this is the model whose one-parameter diagram in m is the
+// standard picture of the G1/S transition, with a bistable region bounded by
+// folds and oscillatory regions bounded by Hopf points.
+//
+// Two Michaelis-Menten terms with very small J values (0.04) make the y
+// equation extremely stiff near y = 0 and y = 1, so the step size should be
+// seen to thrash in the diagnostics panel around the sharp turns. That is
+// the corrector working, not failing.
+//
+// NOTE ON THE RANGE. m is a cell mass, so only m > 0 is physical, and the
+// steady-state solver will not find a sensible starting point at m <= 0.
+// Start from the model's own m = 1 and let the continuation run both ways;
+// the range simply bounds it.
+
+model tyson
+    R1: -> a;  k5p + k5pp*(m*x)^n/(J5^n + (m*x)^n) - k6*a;
+    R2: -> x;  k1 - (k2p + k2pp*y)*x;
+    R3: -> y;  (k3p + k3pp*a)*(1 - y)/(J3 + 1 - y) - k4*m*x*y/(J4 + y);
+
+    J3   = 0.04;
+    J4   = 0.04;
+    J5   = 0.3;
+    k1   = 0.04;
+    k2p  = 0.04;
+    k2pp = 1;
+    k3p  = 1;
+    k3pp = 10;
+    k4   = 35;
+    k5p  = 0.005;
+    k5pp = 0.2;
+    k6   = 0.1;
+    m    = 1;
+    n    = 4;
+
+    // NOT (1,1,1). Those are simulation defaults, and y = 1 sits exactly at
+    // (1-y) = 0, one finite-difference step from the pole at y = 1 + J3 =
+    // 1.04. Both steady-state routes stall there: libRoadRunner reports a
+    // singular Jacobian, and damped Newton has every trial step rejected by
+    // the line search because it lands on or past the pole.
+    //
+    // These are the actual steady state at m = 1, found by eliminating
+    //     x = k1/(k2' + k2'' y),  a = [k5' + k5'' x^4/(J5^4 + x^4)]/k6
+    // and solving the remaining scalar equation in y.
+    a = 0.55;
+    x = 0.23;
+    y = 0.135;
+end

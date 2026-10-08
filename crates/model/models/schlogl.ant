@@ -1,0 +1,41 @@
+/*
+[bifurcation]
+parameter: kin
+min: 20
+max: 28
+ds: 0.001
+dsMax: 0.02
+maxSteps: 4000
+*/
+
+// SCHLOGL'S MODEL - the textbook bistable reaction network.
+//
+//   R1:  A + 2X -> 3X    k1*A*X^2     autocatalysis, A chemostatted
+//   R2:  3X -> A + 2X    k2*X^3       its reverse
+//   R3:  -> X            kin          inflow
+//   R4:  X ->            k4*X         outflow
+//
+//   dX/dt = kin - k4 X + k1 A X^2 - k2 X^3
+//
+//   Run:  parameter kin, range 20 : 28, plot X
+//
+// A cubic rate law with real trimolecular stoichiometry, not a first-order
+// reaction carrying an X^3 rate. With k1 A = 9, k4 = 26, k2 = 1 the folds
+// are where the cubic's derivative 26 - 18 X + 3 X^2 vanishes,
+// X = 3 -+ 1/sqrt(3), giving kin = 23.6151 and 24.3849 in closed form.
+//
+// From the BifurcationTool example library.
+
+model schlogl
+    R1: $A + 2 X -> 3 X;   k1*A*X^2;
+    R2: 3 X -> $A + 2 X;   k2*X^3;
+    R3: -> X;              kin;
+    R4: X -> ;             k4*X;
+
+    A   = 9;
+    k1  = 1;
+    k2  = 1;
+    k4  = 26;
+    kin = 24;
+    X   = 1;
+end

@@ -1,0 +1,49 @@
+/*
+[bifurcation]
+parameter: Da
+min: 0.015
+max: 0.12
+ds: 0.0005
+dsMax: 0.004
+maxSteps: 8000
+*/
+
+// NON-ISOTHERMAL CSTR - the classic ignition/extinction switch.
+//
+//   Run:  parameter Da, range 0.015 : 0.12, plot x
+//   Then: Curve = Fold curve, second parameter B
+//
+// A first-order exothermic reaction in a cooled stirred tank, in the usual
+// dimensionless form:
+//
+//   dx/dt = -x + Da (1-x) exp(y / (1 + y/gam))
+//   dy/dt = -(1+bet) y + B Da (1-x) exp(y / (1 + y/gam))
+//
+// x is conversion, y is temperature rise. Da is the Damkoehler number
+// (residence time), B the heat of reaction, bet the cooling, gam the
+// activation energy.
+//
+// At B = 8 with no cooling the two folds sit at Da = 0.02935 and 0.05733.
+//
+// The S-shaped curve is the ignition/extinction hysteresis every reactor
+// engineer knows: turn the residence time up slowly and the reactor sits
+// cold until it ignites at the upper fold; turn it back down and it stays
+// hot past the point where it ignited, until it extinguishes at the lower
+// fold. The width of that hysteresis is the gap between the two folds.
+//
+// Continuing the folds in (Da, B) finds the CUSP where the two of them
+// merge - the heat of reaction below which the reactor cannot be made to
+// ignite at all. That is the number the design question actually turns on,
+// and it is a codimension-2 quantity: no single one-parameter diagram
+// shows it.
+
+-> x; -x + Da*(1 - x)*exp(y/(1 + y/gam))
+-> y; -(1 + bet)*y + B*Da*(1 - x)*exp(y/(1 + y/gam))
+
+Da  = 0.04
+B   = 8
+bet = 0
+gam = 20
+
+x = 0.02
+y = 0.05

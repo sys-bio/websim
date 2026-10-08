@@ -1,0 +1,48 @@
+/*
+[bifurcation]
+parameter: k0
+min: 0
+max: 1.2
+ds: 0.001
+dsMax: 0.02
+maxSteps: 4000
+*/
+
+// COVALENT-MODIFICATION SWITCH - a Goldbeter-Koshland cycle with positive
+// feedback.
+//
+//   J1:  R -> Rp    (k0 + kf Rp) R / (Km + R)    kinase, activated by Rp
+//   J2:  Rp -> R    Vp Rp / (Km + Rp)            phosphatase
+//
+//   Run:  parameter k0, range 0 : 1.2, plot Rp
+//
+// Both steps are Michaelis-Menten with a small Km, so the cycle is
+// zero-order ultrasensitive; the product activating its own kinase turns
+// that steep response into a bistable one, with two folds in the basal
+// signal k0.
+//
+// R + Rp is conserved, and because the model is written with real
+// stoichiometry libRoadRunner finds the moiety itself - one independent
+// species, a nonsingular 1x1 reduced Jacobian.
+//
+// Rp starts at 0.1, not 0. At Rp = 0 exactly, libRoadRunner's
+// finite-differenced elasticities come out around 1e16, and the load-time
+// species-ordering check reads that as a mismatch and refuses the model.
+// The total R + Rp is still 1.
+//
+// Folds at k0 = 0.2569 and 0.7568.
+//
+// From the BifurcationTool example library.
+
+model covalent
+    J1: R -> Rp;  (k0 + kf*Rp)*R/(Km + R);
+    J2: Rp -> R;  Vp*Rp/(Km + Rp);
+
+    R  = 0.9;
+    Rp = 0.1;
+
+    k0 = 0.5;
+    kf = 1;
+    Km = 0.02;
+    Vp = 1;
+end

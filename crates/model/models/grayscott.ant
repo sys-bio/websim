@@ -1,0 +1,40 @@
+/*
+[bifurcation]
+parameter: F
+plot: V
+min: 0
+max: 0.25
+ds: 0.0005
+dsMax: 0.002
+maxSteps: 450
+*/
+
+// GRAY-SCOTT - an ISOLA of equilibria.
+//
+//   dU/dt = F (1 - U) - U V^2
+//   dV/dt = U V^2 - (F + k) V
+//
+//   Run:  parameter F, range 0 : 0.25, plot V
+//
+// The trivial state U = 1, V = 0 exists for every F. The nontrivial states
+// form a CLOSED LOOP in F, disconnected from it, so no continuation of the
+// trivial branch can reach them. The initial values here sit on the loop,
+// so a plain run traces it; start at U = 1, V = 0 for the trivial branch.
+//
+// A closed curve has no end, so the run is stopped by its point budget or
+// by arriving back at its start, not by the parameter range.
+//
+// A pure ODE model, one source reaction per state.
+//
+// From the BifurcationTool example library.
+
+model grayscott
+    J1: -> U;  F*(1 - U) - U*V^2;
+    J2: -> V;  U*V^2 - (F + k)*V;
+
+    F = 0.08;
+    k = 0.04;
+
+    U = 0.3;
+    V = 0.5;
+end

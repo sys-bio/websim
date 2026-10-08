@@ -141,6 +141,31 @@ x = 1; v = 0
     ),
 ];
 
+/// Models for the bifurcation view, from the Delphi Bifurcata project (the
+/// files are in `models/`). Each carries a `[bifurcation]` block giving the
+/// parameter to vary, its range and the step sizes, so loading one is enough.
+pub const BIFURCATION_EXAMPLES: &[(&str, &str)] = &[
+    ("Tyson–Novak cell cycle (3 variables)", include_str!("../models/tyson.ant")),
+    ("Tyson–Novak 2001 cell cycle (8 variables)", include_str!("../models/tyson2001.ant")),
+    ("Tyson–Novak 2001, compact form", include_str!("../models/user_tyson.ant")),
+    ("Hopf and two folds", include_str!("../models/hopf2folds.ant")),
+    ("Bistable switch", include_str!("../models/bistable.ant")),
+    ("Edelstein (conserved moiety)", include_str!("../models/edelstein.ant")),
+    ("Covalent modification switch", include_str!("../models/covalent.ant")),
+    ("Schlögl", include_str!("../models/schlogl.ant")),
+    ("CSTR ignition and extinction", include_str!("../models/cstr.ant")),
+    ("Brusselator", include_str!("../models/brusselator.ant")),
+    ("Selkov glycolysis", include_str!("../models/selkov.ant")),
+    ("Goodwin oscillator", include_str!("../models/goodwin.ant")),
+    ("Gray–Scott (an isola)", include_str!("../models/grayscott.ant")),
+    ("Predator–prey", include_str!("../models/predprey.ant")),
+    ("PP2 (AUTO demo)", include_str!("../models/pp2.ant")),
+    ("MatCont Lab 2", include_str!("../models/Lab2_Matcont.ant")),
+    ("Catalytic oscillator (MatCont §8.1.5)", include_str!("../models/MatCont_Manual_815_Chemical_Oscil.ant")),
+    ("Lorenz-84", include_str!("../models/lorenz84.ant")),
+    ("Morris–Lecar neuron", include_str!("../models/morris_lecar.ant")),
+];
+
 /// One statement produced by the Antimony front end.
 #[derive(Debug)]
 pub struct Stmt {

@@ -1,0 +1,93 @@
+/*
+[bifurcation]
+parameter: p1
+min: 0
+max: 1
+ds: 0.01
+dsMax: 0.02
+maxSteps: 600
+*/
+
+// PP2, the AUTO-07p demo, transcribed from demos/pp2/pp2.f90 and c.pp2.
+//
+//     fish'   = p2 fish (1 - fish) - fish sharks - p1 (1 - exp(-p3 fish))
+//     sharks' = -sharks + p4 fish sharks
+//
+// with p2 = 3, p3 = 5, p4 = 3, and p1 - the HARVESTING QUOTA, AUTO calls it
+// `quota` - the continuation parameter over [0, 1]. AUTO names the states
+// `fish` and `sharks`; PAR(1..4) there are p1..p4 here, in the same order,
+// so a run can be laid beside AUTO's output without translating anything.
+//
+// The last of specification section 11.2's six validation models. It is
+// there for the AUTOMATIC DIAGRAM of section 8 - its tree structure is what
+// AUTO's published output is compared against - so it is the model stage 6
+// will be judged on. Nothing here exercises stage 6 yet, because stage 6 is
+// not written; what it does exercise now is the branch structure that
+// diagram would have to find.
+//
+// WHY IT HAS THAT STRUCTURE. The origin is an equilibrium for every p1: the
+// harvesting term p1(1 - exp(-p3 fish)) vanishes with fish, so
+// fish = sharks = 0 solves both equations identically. That trivial branch
+// runs the whole length of the parameter range and sheds NON-TRIVIAL
+// branches at the parameter values where one of its eigenvalues crosses
+// zero. A diagram of this model is therefore a tree rather than a single
+// curve, which is the point.
+//
+// A PURE ODE MODEL, one source reaction per state. `fish` goes NEGATIVE on
+// part of the diagram - AUTO's own c.pp2 stops the run at fish = -0.25 - so
+// this is not a concentration and must not be read as one.
+//
+// Start it at the origin explicitly. A steady-state solve from the declared
+// initial values is not wrong, but the trivial branch is the one the
+// structure hangs off and `--start 0,0` says so.
+//
+// EVERY BIFURCATION ON THE FIRST TWO BRANCHES HAS A CLOSED FORM, which is
+// what makes this model worth more than a tree to look at. On the trivial
+// branch the Jacobian is diagonal - diag(p2 - p1 p3, -1) - so its spectrum
+// is exact; on the fish-only branch sharks = 0 leaves a scalar equation, and
+// the coexistence branch has fish pinned at 1/p4, which leaves another.
+// Computed against the library:
+//
+//     BP  trivial branch        p1 = 3/5                    = 0.600000000000
+//     NS0 trivial branch        p1 = (p2-1)/p3              = 0.400000000000
+//         (a NEUTRAL SADDLE, both eigenvalues real - not a Hopf, and the
+//          library says so)
+//     BP  fish-only branch      p1 = (2/3)/(1-exp(-5/3))    = 0.821904345374
+//     LP  fish-only branch                                    0.832929322234
+//     H   coexistence branch                                  0.671593847479
+//         supercritical, omega = 0.604782221942, period 10.389169984
+//
+// bifurcata returns 0.6000000023, 0.4000000023, 0.8219043458, 0.8329293222
+// and 0.6715938423 - nine or ten significant figures on every one.
+//
+// THE DIAGRAM IS THREE LEVELS DEEP: trivial -> fish-only -> coexistence,
+// and the Hopf is on the third. `--switch` goes ONE level, so it reaches the
+// fish-only branch and the coexistence branch has to be started by hand,
+// with --start. Reaching it automatically is stage 6, which is what this
+// model is really here for.
+//
+// Suggested runs:
+//     bifurcata run pp2.ant --param p1 --range 0:1 --start 0,0
+//         the trivial branch: the branch point at 0.6 and the neutral
+//         saddle at 0.4
+//     bifurcata run pp2.ant --param p1 --range 0:1 --start 0,0 --switch
+//         and the fish-only branch that comes out of it, carrying the fold
+//         at 0.8329 and a second branch point at 0.8219
+//     bifurcata run pp2.ant --param p1 --range 0:1 --start 0.33333333333333,2
+//         the coexistence branch and its Hopf at 0.6716
+//     bifurcata cycles pp2.ant --param p1 --range 0:1
+//               --start 0.33333333333333,2
+//         the cycles growing out of that Hopf
+
+model pp2
+    -> fish;    p2*fish*(1 - fish) - fish*sharks - p1*(1 - exp(-p3*fish));
+    -> sharks;  -sharks + p4*fish*sharks;
+
+    p1 = 0;
+    p2 = 3;
+    p3 = 5;
+    p4 = 3;
+
+    fish   = 0;
+    sharks = 0;
+end

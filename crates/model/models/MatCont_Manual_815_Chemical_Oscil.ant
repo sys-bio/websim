@@ -1,0 +1,32 @@
+/*
+[bifurcation]
+parameter: q2
+min: 0.08
+max: 2.3
+*/
+
+// Matcont manual 8.1.5 Example: a catalytic oscillator
+// Parameter = q2 
+// Range = 0.0\8 to 2.2
+// Output = x
+
+// Shows Hopf, LP, LP, Hopf  
+// label = H , x = ( 0.016357 0.523973 0.328336 1.051558 )
+// First Lyapunov coefficient = 1.070259e+01
+// label = LP, x = ( 0.024717 0.450257 0.375018 1.042049 )
+// label = LP, x = ( 0.054030 0.302241 0.459807 1.052200 )
+// label = H , x = ( 0.077929 0.233063 0.492149 1.040991 )
+
+    z := 1 - x - y - s
+     
+    -> x; 2*q1*z^2 - 2*q5*x^2 - q3*x*y 
+    -> y; q2*z - q6*y - q3*x*y 
+    -> s; q4*z - k*q4*s
+
+q1 = 2.5
+q2 = 2.204678
+q3 = 10
+q4 =0.0675
+q5 = 1
+q6 = 0.1
+k = 0.4

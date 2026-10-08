@@ -1,0 +1,48 @@
+/*
+[bifurcation]
+parameter: a
+min: -1.5
+max: 1.5
+plot: x
+*/
+
+// ONE HOPF AND TWO TURNING POINTS - all three codim-1 equilibrium
+// bifurcations on a single branch.
+//
+//   dx/dt = x(1-x)(1+x) - y  =  x - x^3 - y
+//   dy/dt = (x-a)(b-y) - c
+//
+//   Run:  parameter a, range -1.5 : 1.5, plot x
+//
+// The cubic nullcline x - x^3 = y is S-shaped, so the branch folds twice;
+// the second equation supplies the slow feedback that makes the middle
+// section lose stability through a HOPF rather than simply being a saddle.
+// A FitzHugh-Nagumo-shaped system: the same geometry that produces
+// excitability and relaxation oscillation.
+//
+// This is the most demanding of the example models, because all three
+// detectors have to fire on one branch and none of them may fire on the
+// others' events:
+//
+//   - the fold test function (parameter component of the tangent) must
+//     vanish at the two turning points and NOT at the Hopf;
+//   - the bialternate determinant must vanish at the Hopf and be
+//     disambiguated from a neutral saddle by the spectrum;
+//   - the branch-point determinant must not vanish anywhere.
+//
+// Note the rates can be negative. These are written as synthesis reactions
+// with signed rate laws rather than as mass action, so x and y are free to
+// go negative - which they must, since the interesting geometry is around
+// the origin.
+
+model hopf2folds
+    J1: -> x;  x*(1-x)*(1+x) - y;
+    J2: -> y;  (x-a)*(b-y) - c;
+
+    a = -0.5;
+    b = 0.5;
+    c = 0.1;
+
+    x = 0;
+    y = 0;
+end

@@ -33,6 +33,13 @@ with steady states, conservation analysis or continuation.
   - `newton.rs` — damped Newton, Armijo line search, Levenberg–Marquardt.
   - `steady.rs` — steady states and stability.
   - `ode.rs`, `solvers.rs` — RK4, and BDF/ESDIRK34/Tsit45 via diffsol.
+  - `models/` — the bifurcation examples (`BIFURCATION_EXAMPLES`), copied from
+    the Delphi project's `GUIApp\Win64\Debug\models` (the copies the baselines
+    were made from). Each has a `[bifurcation]` block; where the Delphi file
+    had none, one was written from its baseline's run. The catalytic
+    oscillator's range is widened to 2.3 so its start (q2 = 2.2047) lies
+    inside it. `every_bifurcation_example_runs` (in `src/bifurcation.rs`)
+    runs them all.
 - `crates/model/tests/delphi_models.rs` — checks against the Delphi project's
   bundled models and baselines (see Testing).
 - `docs/` — the bifurcation plan.

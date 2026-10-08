@@ -1,0 +1,54 @@
+/*
+[bifurcation]
+parameter: p
+min: 1
+max: 60
+plot: x1
+*/
+
+// GOODWIN OSCILLATOR, 5 stages - a Hopf in a higher-dimensional system.
+//
+//   dx1/dt = 1/(1 + x5^p) - x1
+//   dxi/dt = x(i-1) - xi          for i = 2..5
+//
+// A negative-feedback loop: the last species represses production of the
+// first. Every stage has unit rate, so the steady state is uniform,
+// x_i = x with x(1 + x^p) = 1.
+//
+//   Run:  parameter p, range 20 : 80, plot x1
+//
+// Analytic result. The Jacobian is bidiagonal with one corner entry, giving
+// the characteristic equation (lambda + 1)^n + g = 0 with g = p(1 - x).
+// The real part vanishes when
+//
+//     g = sec(pi/n)^n          and there   omega = tan(pi/n)
+//
+// For n = 5 that is g = 2.8854, reached at p = 58.513, and
+//
+//     omega = tan(36 deg) = 0.72654253
+//
+// independent of p and of the steady state - which makes it an exact check
+// that costs nothing to evaluate.
+//
+// Note how long the chain has to be. g grows only like ln(p), so the
+// classical 3-stage Goodwin needs a Hill coefficient of about 8*exp(8), some
+// 24000, before it will oscillate at all. Five stages brings it down to a
+// merely implausible 58.5; ten stages to a reasonable 11.5. That steep
+// dependence on chain length is the actual content of the Goodwin result.
+
+model goodwin
+    J1: -> x1;    1/(1 + x5^p);
+    J2: x1 -> x2; x1;
+    J3: x2 -> x3; x2;
+    J4: x3 -> x4; x3;
+    J5: x4 -> x5; x4;
+    J6: x5 -> ;   x5;
+
+    p = 20;
+
+    x1 = 0.9;
+    x2 = 0.9;
+    x3 = 0.9;
+    x4 = 0.9;
+    x5 = 0.9;
+end

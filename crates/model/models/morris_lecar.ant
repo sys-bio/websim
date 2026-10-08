@@ -1,0 +1,72 @@
+/*
+[bifurcation]
+parameter: Iapp
+min: 60
+max: 250
+ds: 0.05
+dsMax: 2.0
+maxSteps: 600
+*/
+
+// Morris-Lecar, the Type II (class 2 excitability) parameterisation.
+//
+//     C V' = Iapp - gL(V - VL) - gCa Mss(V)(V - VCa) - gK N (V - VK)
+//       N' = phi cosh((V - V3)/(2 V4)) (Nss(V) - N)
+//
+//     Mss(V) = 0.5 (1 + tanh((V - V1)/V2))
+//     Nss(V) = 0.5 (1 + tanh((V - V3)/V4))
+//
+// The standard neuroscience benchmark named in specification section 11.2,
+// and the reason it is here: with these parameters the Hopf point on the
+// equilibrium branch is SUBCRITICAL, so the cycle branch that grows out of
+// it is unstable and turns round at a FOLD OF CYCLES. Every other model in
+// this directory grows a stable cycle branch that never folds, which is why
+// `curve --type lpc` had nothing to run on.
+//
+// A PURE ODE MODEL, written with the one-source-reaction-per-state idiom -
+// the rate law is arbitrary and the states may go negative, which V does
+// throughout: it is a membrane potential in mV, not a concentration.
+//
+// Parameters are Rinzel and Ermentrout's Type II set, as reproduced in
+// Ermentrout & Terman, Mathematical Foundations of Neuroscience, and in
+// Izhikevich's Dynamical Systems in Neuroscience. Iapp is the injected
+// current, in microamps per square centimetre, and is the natural
+// continuation parameter.
+//
+// THE [bifurcation] BLOCK AT THE TOP MATTERS HERE. The cycle branch is a
+// large relaxation orbit, so most of the arclength goes into the state and
+// the parameter crawls: at the default maximum step of 0.1 the fold is still
+// three thousand points away. dsMax = 2.0 reaches it in about two hundred.
+//
+// Suggested runs:
+//     bifurcata run morris_lecar.ant --param Iapp --range 60:250
+//         the equilibrium branch and its subcritical Hopf at
+//         Iapp = 93.8576, l1 = +0.0065
+//     bifurcata cycles morris_lecar.ant --param Iapp --range 60:250
+//         the cycle branch from that Hopf, with the FOLD OF CYCLES on it at
+//         Iapp = 88.29325
+//     bifurcata curve morris_lecar.ant --param Iapp --param2 gCa --type lpc
+//                     --range 60:250
+//         that fold of cycles followed in both parameters
+
+model morris_lecar
+    -> V;  (Iapp - gL*(V - VL) - gCa*0.5*(1 + tanh((V - V1)/V2))*(V - VCa) - gK*N*(V - VK)) / C;
+    -> N;  phi*cosh((V - V3)/(2*V4))*(0.5*(1 + tanh((V - V3)/V4)) - N);
+
+    C   = 20;
+    gL  = 2;
+    VL  = -60;
+    gCa = 4.4;
+    VCa = 120;
+    gK  = 8;
+    VK  = -84;
+    V1  = -1.2;
+    V2  = 18;
+    V3  = 2;
+    V4  = 30;
+    phi = 0.04;
+    Iapp = 80;
+
+    V = -60;
+    N = 0.01;
+end

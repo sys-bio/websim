@@ -1,0 +1,55 @@
+/*
+[bifurcation]
+parameter: A
+min: 0
+max: 12
+plot: X
+*/
+
+// EDELSTEIN BISTABLE SYSTEM - bistability WITH a conserved moiety.
+//
+//   R0:  -> X          kb
+//   R1:  X -> 2X       k1*A*X        autocatalysis
+//   R2:  2X -> X       km1*X^2
+//   R3:  X + E -> C    k2*X*E        enzyme sequestration
+//   R4:  C -> X + E    km2*C
+//   R5:  C -> E        k3*C
+//
+//   Run:  parameter A, range 0 : 12, plot X
+//
+// What makes this one different from bistable.ant is the CONSERVED CYCLE.
+// R3, R4 and R5 only move material between E and C, so E + C is constant -
+// here 1, from the initial values. There are three floating species but only
+// TWO independent ones.
+//
+// That is not a detail. The full Jacobian N.eps of a network with a conserved
+// moiety is structurally singular: the conservation relation contributes an
+// exact zero eigenvalue, every equilibrium looks non-hyperbolic, Newton
+// cannot converge and the fold test function is meaningless. Continuation
+// runs on the REDUCED system in independent species only (specification
+// section 3.2), which libRoadRunner supplies directly.
+//
+// Watch the diagnostics panel: it reports two independent species and one
+// dependent one, and the ordering check confirms the reduced Jacobian agrees
+// with N_R.eps.L in libRoadRunner's own reordered basis.
+
+model edelstein
+    R0: -> X;         kb;
+    R1: X -> 2X;      k1*A*X;
+    R2: 2X -> X;      km1*X^2;
+    R3: X + E -> C;   k2*X*E;
+    R4: C -> X + E;   km2*C;
+    R5: C -> E;       k3*C;
+
+    X = 0.2;
+    E = 1;
+    C = 0;
+
+    A   = 4;
+    k1  = 1;
+    km1 = 0.2;
+    k2  = 50;
+    km2 = 1;
+    k3  = 1;
+    kb  = 0.1;
+end

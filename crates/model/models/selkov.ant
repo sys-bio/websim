@@ -1,0 +1,42 @@
+/*
+[bifurcation]
+parameter: v0
+min: 0.02
+max: 1.2
+plot: P
+*/
+
+// SELKOV GLYCOLYSIS - a supercritical Hopf.
+//
+//   dS/dt = v0 - S P^2
+//   dP/dt = S P^2 - kp P
+//
+// The classical two-variable glycolytic oscillator. Substrate S is supplied
+// at a constant rate and consumed by an autocatalytic step in the product P,
+// which is itself removed linearly.
+//
+//   Run:  parameter v0, range 0.02 : 1.2, plot P
+//
+// Analytic result: the steady state is P* = v0/kp, S* = kp^2/v0, where the
+// Jacobian has trace kp - v0^2/kp^2 and determinant v0^2/kp > 0. The
+// determinant is positive everywhere, so there is NO fold; the trace
+// vanishes at
+//
+//     v0 = kp^(3/2)          and there   omega = kp
+//
+// With kp = 0.6 that is a Hopf at v0 = 0.46475800154, omega = 0.6 exactly.
+// Bifurcata locates it at v0 = 0.464758002 with omega = 0.600000001 and
+// reports l1 = -0.278, so the Hopf is supercritical: a stable limit cycle
+// emerges and the oscillation grows smoothly out of the steady state.
+
+model selkov
+    J1: -> S;    v0;
+    J2: S -> P;  S*P^2;
+    J3: P -> ;   kp*P;
+
+    v0 = 0.02;
+    kp = 0.6;
+
+    S = 18;
+    P = 0.0333;
+end

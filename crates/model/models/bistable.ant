@@ -1,0 +1,43 @@
+/*
+[bifurcation]
+parameter: kdeg
+min: 0.7
+max: 1.3
+plot: X
+*/
+
+// BISTABLE SWITCH - two folds, hysteresis.
+//
+//   dX/dt = v0 + v1 X^2/(Kh^2 + X^2) - kdeg X
+//
+// Autoactivation with a leak: a sigmoid production term and linear decay
+// cross in three places over a window of kdeg, giving two stable states
+// separated by an unstable one. The standard positive-feedback switch.
+//
+//   Run:  parameter kdeg, range 0.7 : 1.3, plot X
+//
+// Expect an S-shaped curve. The branch climbs the upper stable state, turns
+// back at a FOLD near kdeg = 1.1056, runs right-to-left along the unstable
+// middle branch, turns again at a second FOLD near kdeg = 0.8704, then
+// continues along the lower stable state. Between the two folds the system
+// is bistable - which state you land in depends on where you started, and
+// that is the hysteresis.
+//
+// This is the case pseudo-arclength continuation exists for: natural
+// parameter continuation cannot get round either fold.
+//
+// (The decay constant is named kdeg and the saturation constant Kh rather
+//  than k and K. SBML identifiers are case-sensitive, so k and K would be
+//  two different parameters - legal, and very easy to confuse.)
+
+model bistable
+    J1: -> X;   v0 + v1*X^2/(Kh^2 + X^2);
+    J2: X -> ;  kdeg*X;
+
+    v0   = 0.05;
+    v1   = 1;
+    Kh   = 0.5;
+    kdeg = 0.7;
+
+    X = 1.3;
+end

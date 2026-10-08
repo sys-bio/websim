@@ -1,0 +1,51 @@
+/*
+[bifurcation]
+parameter: F
+min: 0
+max: 4
+ds: 0.002
+dsMax: 0.02
+maxSteps: 4000
+*/
+
+// LORENZ-84 ATMOSPHERIC CIRCULATION MODEL - a codimension-2 showcase.
+//
+//   Run:  parameter F, range 0 : 4, plot X
+//   Then: Curve = Hopf curve, second parameter G
+//
+// Lorenz's low-order model of the mid-latitude westerly wind (X) and the
+// cosine and sine phases of a superposed wave (Y, Z):
+//
+//   dX/dt = -Y^2 - Z^2 - alpha (X - F)
+//   dY/dt = X Y - beta X Z - Y + G
+//   dZ/dt = beta X Y + X Z - Z
+//
+// F is the symmetric thermal forcing (equator-to-pole), G the asymmetric
+// one. Nothing here is a concentration: Y and Z are genuinely negative over
+// most of the diagram. Written as source reactions purely so libRoadRunner
+// has reactions to build a stoichiometry matrix from.
+//
+// One parameter: a fold near F = 1.1888 and a Hopf near F = 1.2789.
+//
+// TWO parameters is where it gets interesting. The Hopf curve in (F, G) is
+// a parabola-like arc symmetric about G = 0 - the model is invariant under
+// (G, Y, Z) -> (-G, -Y, -Z) - carrying a ZERO-HOPF point on each arm, near
+// G = +/- 1.7. Those are the points where a fold curve and a Hopf curve
+// meet, and they organise the whole picture: the fold curve terminates on
+// them, and cycles are born and destroyed around them.
+//
+// This is the model BifurcationKit's own codimension-2 tutorial uses, which
+// makes it a convenient thing to compare against.
+
+-> X; -Y^2 - Z^2 - alpha*(X - F)
+-> Y; X*Y - beta*X*Z - Y + G
+-> Z; beta*X*Y + X*Z - Z
+
+alpha = 0.25
+beta  = 4
+G     = 1
+F     = 2
+
+X = 1
+Y = 0.5
+Z = 0.5
