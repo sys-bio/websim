@@ -1,6 +1,6 @@
 # Plan: a pure-Rust bifurcation library (stages 0–3)
 
-**Status:** in progress — M0 done (see §5.4 and §8) · **Date:** October 2026
+**Status:** in progress — M0 and M1 done (see §5.4 and §8) · **Date:** October 2026
 **Scope of this plan:** up to and including specification stage 3 (equilibria and
 codimension-2 curves). Periodic orbits (stages 4–5) and automatic diagrams
 (stage 6) are deliberately excluded; a separate plan follows a review at the end
@@ -351,8 +351,8 @@ Each milestone ends with all ported tests passing and a review point.
 | Milestone | Repository | Content | Exit criterion | Status |
 |---|---|---|---|---|
 | **M0** | websim | Workspace split; stoichiometry and conservation analysis; reduced rates and Jacobian; steady-state solver; Steady-state action in the app; all 21 bundled `.ant` models load | moiety3/edelstein/consistency checks pass; steady states match the baselines' first points | **Done**, October 2026 (§5.4): 20/20 baselines to 1.3e-11 |
-| **M1** | bifurcata-rs | Repo, CI (native + wasm build), types, linalg over faer, bordered solver, problem trait, test problems | `Tests.Stage0` ported and passing | Next |
-| **M2** | bifurcata-rs | Newton, PALC engine, equilibrium system, stability, LP/BP/H detection with location; serialisation, comparator, `run` and `compare` commands; `antimony` adapter | Equilibrium baselines (built-in + `ant_*` + conserved totals) agree to 6 s.f.; PP2 closed forms | — |
+| **M1** | bifurcata-rs | Repo, CI (native + wasm build), types, linalg over faer, bordered solver, problem trait, test problems | `Tests.Stage0` ported and passing | **Done**, October 2026: Stage 0 ported, mutation-tested; CI with tests, clippy, wasm |
+| **M2** | bifurcata-rs | Newton, PALC engine, equilibrium system, stability, LP/BP/H detection with location; serialisation, comparator, `run` and `compare` commands; `antimony` adapter | Equilibrium baselines (built-in + `ant_*` + conserved totals) agree to 6 s.f.; PP2 closed forms | Next |
 | **M3** | bifurcata-rs | Directional derivatives, normal forms (fold `a`, Hopf `l1`, BP), branch switching (`run --switch`) | Normal-form coefficients to 3 s.f. with correct signs; Brusselator `l1 = −0.5`; PP2 switches | — |
 | **M4** | bifurcata-rs | Codim-2 fold and Hopf curves; CP/BT/ZH/GH/HH detection; CP/BT/ZH normal forms; `curve` command | `Tests.Codim2` ported; `bistable_fold`, `lorenz84_hopf` baselines; MatCont §8.1.5 values | — |
 | **M5** | websim | Bifurcation view in the app: one-parameter branches growing live with stability colouring and markers; switching at branch points; two-parameter fold/Hopf curves; CSV export; published to GitHub Pages | Usable in the browser on the bundled models | — |

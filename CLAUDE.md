@@ -101,6 +101,6 @@ All found while matching the Delphi baselines; the plan, §5.4, has more.
 ## Progress
 
 See the milestone table in `docs/bifurcation-rust-plan.md` (§8). In short:
-**M0 done** (conservation analysis, steady states; October 2026). Next is
-**M1** in bifurcata-rs: repository and CI, linear algebra over faer, the
-bordered solver, the problem trait and test problems, porting `Tests.Stage0`.
+**M0 done** (conservation analysis, steady states; October 2026). **M1 done**
+in bifurcata-rs (foundations, Stage 0 ported). Next is **M2** there: Newton,
+the continuation engine, equilibria and fold/branch-point/Hopf detection.
