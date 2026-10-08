@@ -1767,14 +1767,13 @@ dependencies = [
 name = "gui_test"
 version = "0.1.0"
 dependencies = [
- "diffsol",
  "eframe",
  "egui_plot",
- "getrandom 0.3.4",
  "js-sys",
  "rfd",
  "wasm-bindgen-futures",
  "web-sys",
+ "websim-model",
 ]
 
 [[package]]
@@ -4577,6 +4576,16 @@ dependencies = [
  "objc2-foundation 0.3.2",
  "url",
  "web-sys",
+]
+
+[[package]]
+name = "websim-model"
+version = "0.1.0"
+dependencies = [
+ "diffsol",
+ "faer",
+ "getrandom 0.3.4",
+ "serde_json",
 ]
 
 [[package]]

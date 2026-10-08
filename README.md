@@ -14,7 +14,9 @@ A small ODE simulator for biochemical models, written in Rust with
 - Sliders for every parameter and initial value, with live re-simulation
 - Solvers: BDF, ESDIRK34 and Tsit45 from [diffsol](https://github.com/martinjrobins/diffsol),
   plus fixed-step RK4
-- Plots of species and reaction rates, and a phase plane
+- Steady states with stability (eigenvalues), on the reduced system: conservation
+  analysis finds conserved moieties automatically
+- Plots of species and reaction rates, and a phase plane; CSV export and copy
 
 ## Building
 

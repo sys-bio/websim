@@ -1,19 +1,16 @@
 // Don't open a console window on Windows (debug and release builds).
 #![windows_subsystem = "windows"]
 
-mod antimony;
 mod export;
-mod model;
-mod ode;
-mod solvers;
 
 use std::collections::HashMap;
 
 use eframe::egui;
 use egui::{Color32, vec2};
 use egui_plot::{Legend, Line, LineStyle, Plot, Points, VLine};
-use model::{EXAMPLES, Model, Results};
-use solvers::{Method, SolverSettings};
+use websim_model::model::{EXAMPLES, Model, Results};
+use websim_model::solvers::{Method, SolverSettings};
+use websim_model::steady::{Stability, SteadyState, find_steady_state};
 
 /// Desktop entry point: open a native window.
 #[cfg(not(target_arch = "wasm32"))]
@@ -81,6 +78,94 @@ fn set_font_sizes(ctx: &egui::Context) {
         ]
         .into();
     });
+}
+
+/// The body of the "Steady state" section: found on the reduced system
+/// (independent species), recomputed whenever the model or a value changes.
+fn steady_state_panel(ui: &mut egui::Ui, model: &mut Model, cache: &mut Option<(Model, Result<SteadyState, String>)>) {
+    let up_to_date = matches!(cache, Some((m, _)) if m == model);
+    if !up_to_date {
+        let result = find_steady_state(model, &model.initial_state(), &model.parameter_values());
+        *cache = Some((model.clone(), result));
+    }
+    let Some((_, result)) = cache else { return };
+
+    let names = model.species_names();
+    let conservation = model.conservation();
+    if conservation.law_count() > 0 {
+        ui.label(format!(
+            "{} independent species of {}. Conserved:",
+            conservation.independent.len(),
+            names.len()
+        ));
+        for law in conservation.describe(&names, &model.initial_state()) {
+            ui.monospace(format!("  {law}"));
+        }
+    }
+
+    let ss = match result {
+        Err(e) => {
+            ui.colored_label(ui.visuals().error_fg_color, e.as_str());
+            return;
+        }
+        Ok(ss) => ss,
+    };
+    let (text, colour) = match ss.stability {
+        Stability::Stable => ("Stable", Color32::from_rgb(60, 170, 90)),
+        Stability::Unstable => ("Unstable", Color32::from_rgb(220, 80, 60)),
+        Stability::Marginal => ("Marginal (an eigenvalue on the imaginary axis)", ui.visuals().warn_fg_color),
+    };
+    ui.colored_label(colour, egui::RichText::new(text).strong());
+    if let Some(warning) = &ss.warning {
+        ui.colored_label(ui.visuals().warn_fg_color, warning.as_str());
+    }
+
+    egui::Grid::new("steady_values").striped(true).show(ui, |ui| {
+        for (name, value) in names.iter().zip(&ss.state) {
+            ui.label(name.as_str());
+            ui.monospace(format_precise(*value));
+            ui.end_row();
+        }
+    });
+
+    ui.label("Eigenvalues:");
+    let mut shown = Vec::new();
+    for &(re, im) in &ss.eigenvalues {
+        if im < 0.0 && shown.iter().any(|&(r, i): &(f64, f64)| r == re && i == -im) {
+            continue; // the conjugate of one already listed as ±
+        }
+        shown.push((re, im));
+        let text = if im == 0.0 {
+            format_precise(re)
+        } else {
+            format!("{} ± {}i", format_precise(re), format_precise(im.abs()))
+        };
+        ui.monospace(format!("  {text}"));
+    }
+
+    ui.small(format!("Found by {}; largest rate {:.1e}.", ss.route, ss.max_rate));
+    if ui
+        .button("Use as initial values")
+        .on_hover_text("Set each species' initial value to its steady-state value")
+        .clicked()
+    {
+        for (species, value) in model.species.iter_mut().zip(&ss.state) {
+            species.value = *value;
+        }
+    }
+}
+
+/// Six significant figures, in scientific notation for very large or small values.
+fn format_precise(v: f64) -> String {
+    let size = v.abs();
+    if size == 0.0 || !v.is_finite() {
+        format!("{v}")
+    } else if size >= 1e5 || size < 1e-3 {
+        format!("{v:.5e}")
+    } else {
+        let decimals = (5 - size.log10().floor() as i32).max(0) as usize;
+        format!("{v:.decimals$}")
+    }
 }
 
 /// Event markers drawn on the time-course plot, at most.
@@ -273,6 +358,8 @@ struct MyApp {
     dark_mode: bool,
     /// The outcome of the last CSV export or copy: Ok(what happened) or Err(what went wrong).
     export_message: Option<Result<String, String>>,
+    /// The last steady state, with the model (and so the values) it was found for.
+    steady: Option<(Model, Result<SteadyState, String>)>,
 }
 
 impl Default for MyApp {
@@ -293,6 +380,7 @@ impl Default for MyApp {
             phase_y: 1,
             dark_mode: true,
             export_message: None,
+            steady: None,
         }
     }
 }
@@ -456,6 +544,10 @@ impl MyApp {
             if ui.button("Reset values").clicked() {
                 model.reset_values();
             }
+            ui.add_space(4.0);
+            egui::CollapsingHeader::new(egui::RichText::new("Steady state").strong())
+                .default_open(false)
+                .show(ui, |ui| steady_state_panel(ui, model, &mut self.steady));
             ui.add_space(8.0);
             ui.small("Plots: drag to pan, scroll to zoom, double-click to reset the view.");
         });

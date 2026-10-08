@@ -1,0 +1,20 @@
+[package]
+name = "websim-model"
+version = "0.1.0"
+edition = "2024"
+description = "Antimony-subset models: parsing, conservation analysis, steady states and simulation"
+
+[dependencies]
+diffsol = { version = "0.17.1", default-features = false, features = ["nalgebra"] }
+# The same faer that diffsol already pulls in, used for eigenvalues. No default
+# features: they include rayon threads, which the browser lacks (and small
+# matrices do not need).
+faer = { version = "0.24", default-features = false, features = ["std"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# diffsol -> faer -> rand needs getrandom told to use the browser's crypto API
+# (see .cargo/config.toml).
+getrandom = { version = "0.3", features = ["wasm_js"] }
+
+[dev-dependencies]
+serde_json = "1.0.151"

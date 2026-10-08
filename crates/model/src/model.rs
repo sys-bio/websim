@@ -8,6 +8,8 @@ use std::cell::Cell;
 use std::fmt;
 
 use crate::antimony;
+use crate::conservation::Conservation;
+use crate::linalg::Matrix;
 use crate::ode::{SegmentEnd, Solution};
 use crate::solvers::{SolverSettings, solve_segment};
 
@@ -41,6 +43,26 @@ J4: X -> ;            k4*X
 A = 1; B = 3
 k1 = 1; k2 = 1; k3 = 1; k4 = 1
 X = 1; Y = 1
+",
+    ),
+    (
+        "Conserved moiety (Edelstein)",
+        "\
+// Edelstein's bistable network. The enzyme E is
+// sequestered in the complex C, so E + C is conserved:
+// three species, but only two independent ones.
+// Open 'Steady state' to see the conservation law,
+// the reduced system's eigenvalues, and stability.
+R0: -> X;       kb
+R1: X -> 2X;    k1*A*X
+R2: 2X -> X;    km1*X^2
+R3: X + E -> C; k2*X*E
+R4: C -> X + E; km2*C
+R5: C -> E;     k3*C
+
+X = 0.2; E = 1; C = 0
+A = 4; k1 = 1; km1 = 0.2
+k2 = 50; km2 = 1; k3 = 1; kb = 0.1
 ",
     ),
     (
@@ -206,6 +228,22 @@ pub struct Model {
     /// `rates[i]` is d(species[i])/dt.
     rates: Vec<Expr>,
     events: Vec<Event>,
+    /// The stoichiometry matrix N (species × columns): a column per reaction,
+    /// plus one per rate-rule species (`x' = f` counts as `-> x; f`).
+    stoichiometry: Matrix,
+    /// Where each column of `stoichiometry` gets its rate.
+    columns: Vec<Column>,
+    /// The conserved moieties and the reduced system.
+    conservation: Conservation,
+}
+
+/// The rate behind one column of the stoichiometry matrix.
+#[derive(Clone, Debug, PartialEq)]
+enum Column {
+    /// A reaction, whose rate is the rule `vars[j]`.
+    Reaction { name: String, var: usize },
+    /// A rate rule `species[i]' = rates[i]`.
+    RateRule { species: usize },
 }
 
 #[derive(Debug)]
@@ -229,7 +267,54 @@ impl Model {
     /// Parse a model written in (a basic subset of) Antimony.
     pub fn parse(text: &str) -> Result<Model, ParseError> {
         let parsed = antimony::statements(text)?;
-        Model::from_statements(&parsed.stmts, &parsed.events)
+        let mut model = Model::from_statements(&parsed.stmts, &parsed.events)?;
+        model.analyse_stoichiometry(&parsed.stoichiometry)?;
+        Ok(model)
+    }
+
+    /// Build the stoichiometry matrix and analyse its conservation laws.
+    /// `stoichiometry` lists the reaction species: (species, [(reaction, net)]).
+    /// Every other species has a rate rule and gets a column of its own.
+    fn analyse_stoichiometry(&mut self, stoichiometry: &[(String, Vec<(String, f64)>)]) -> Result<(), ParseError> {
+        let species_index = |name: &str| self.species.iter().position(|s| s.name == name);
+        let mut columns: Vec<Column> = Vec::new();
+        for (_, changes) in stoichiometry {
+            for (reaction, _) in changes {
+                if !columns.iter().any(|c| matches!(c, Column::Reaction { name, .. } if name == reaction)) {
+                    let var = self.vars.iter().position(|v| v.symbol.name == *reaction).ok_or_else(|| {
+                        error(0, format!("internal error: no rate for reaction '{reaction}'"))
+                    })?;
+                    columns.push(Column::Reaction { name: reaction.clone(), var });
+                }
+            }
+        }
+        for i in 0..self.species.len() {
+            if !stoichiometry.iter().any(|(s, _)| *s == self.species[i].name) {
+                columns.push(Column::RateRule { species: i });
+            }
+        }
+
+        let mut n = Matrix::zeros(self.species.len(), columns.len());
+        for (species, changes) in stoichiometry {
+            let i = species_index(species).ok_or_else(|| error(0, format!("internal error: unknown species '{species}'")))?;
+            for (reaction, net) in changes {
+                let c = columns
+                    .iter()
+                    .position(|c| matches!(c, Column::Reaction { name, .. } if name == reaction))
+                    .unwrap();
+                n[(i, c)] = *net;
+            }
+        }
+        for (c, column) in columns.iter().enumerate() {
+            if let Column::RateRule { species } = column {
+                n[(*species, c)] = 1.0;
+            }
+        }
+
+        self.conservation = Conservation::analyse(&n);
+        self.stoichiometry = n;
+        self.columns = columns;
+        Ok(())
     }
 
     pub fn from_statements(stmts: &[Stmt], events: &[EventStmt]) -> Result<Model, ParseError> {
@@ -288,6 +373,9 @@ impl Model {
             rule_order: Vec::new(),
             rates: vec![Expr::Num(0.0); species.len()],
             events: Vec::new(),
+            stoichiometry: Matrix::zeros(0, 0),
+            columns: Vec::new(),
+            conservation: Conservation::analyse(&Matrix::zeros(0, 0)),
         };
         let mut vars: Vec<Option<Var>> = vec![None; var_names.len()];
         let mut initial_value_set = vec![false; species.len()];
@@ -374,7 +462,140 @@ impl Model {
             let name = e.name.clone().unwrap_or_else(|| format!("event {}", k + 1));
             model.events.push(Event { name, trigger, assignments });
         }
+        // Until `analyse_stoichiometry` is given the reactions, every species
+        // counts as having a rate rule of its own.
+        model.analyse_stoichiometry(&[])?;
         Ok(model)
+    }
+
+    // ---- The reduced system (conservation analysis) -----------------------
+
+    /// The conserved moieties: which species are independent, and the link matrix.
+    pub fn conservation(&self) -> &Conservation {
+        &self.conservation
+    }
+
+    /// The stoichiometry matrix N (species × columns): a column per reaction,
+    /// then one per rate-rule species.
+    pub fn stoichiometry(&self) -> &Matrix {
+        &self.stoichiometry
+    }
+
+    /// The names of the columns of the stoichiometry matrix.
+    pub fn column_names(&self) -> Vec<String> {
+        self.columns
+            .iter()
+            .map(|c| match c {
+                Column::Reaction { name, .. } => name.clone(),
+                Column::RateRule { species } => format!("{}'", self.species[*species].name),
+            })
+            .collect()
+    }
+
+    pub fn species_names(&self) -> Vec<String> {
+        self.species.iter().map(|s| s.name.clone()).collect()
+    }
+
+    /// The species' initial values: the full state at t = 0.
+    pub fn initial_state(&self) -> Vec<f64> {
+        self.species.iter().map(|s| s.value).collect()
+    }
+
+    /// The current parameter values, indexed as the model's variables
+    /// (rule slots hold placeholders that are recomputed when evaluated).
+    pub fn parameter_values(&self) -> Vec<f64> {
+        self.vars.iter().map(|v| v.symbol.value).collect()
+    }
+
+    /// The index of a parameter in [`Model::parameter_values`], by name.
+    /// Rules are not parameters and are not found.
+    pub fn parameter_index(&self, name: &str) -> Option<usize> {
+        self.vars.iter().position(|v| v.rule.is_none() && v.symbol.name == name)
+    }
+
+    /// The rate of every stoichiometry column at full state `x`.
+    pub fn column_rates(&self, t: f64, x: &[f64], params: &[f64]) -> Vec<f64> {
+        let vars = self.eval_vars(t, x, params);
+        let ctx = Ctx { t, y: x, vars: &vars };
+        self.columns
+            .iter()
+            .map(|c| match c {
+                Column::Reaction { var, .. } => vars[*var],
+                Column::RateRule { species } => self.rates[*species].eval(&ctx),
+            })
+            .collect()
+    }
+
+    /// The reduced right-hand side `N_R v(L u + T)` at time `t`.
+    pub fn reduced_rates(&self, t: f64, u: &[f64], totals: &[f64], params: &[f64]) -> Vec<f64> {
+        let x = self.conservation.full_state(u, totals);
+        let v = self.column_rates(t, &x, params);
+        self.conservation
+            .independent
+            .iter()
+            .map(|&i| self.stoichiometry.row(i).iter().zip(&v).map(|(n, vi)| n * vi).sum())
+            .collect()
+    }
+
+    /// The elasticities `ε = ∂v/∂x` (columns × species) at full state `x`, by
+    /// central differences. Each entry differentiates one rate with respect to
+    /// one species, so there is no cancellation between unrelated terms — the
+    /// same reasoning as libRoadRunner's numerical elasticities (spec §3.1).
+    pub fn elasticities(&self, t: f64, x: &[f64], params: &[f64]) -> Matrix {
+        let scale = x.iter().fold(0.0f64, |m, v| m.max(v.abs()));
+        let mut e = Matrix::zeros(self.columns.len(), x.len());
+        let mut xp = x.to_vec();
+        for s in 0..x.len() {
+            // The step is relative to the species' typical size: its own value,
+            // or for a species at or near zero a thousandth of the largest one —
+            // and 1 if the whole state is zero, as it is when a model starts
+            // from nothing. (A step relative to zero itself would be ~1e-18 and
+            // the difference pure rounding.) cbrt(eps) ≈ 6e-6 is the best
+            // relative step for a central difference.
+            let typical = x[s].abs().max(1e-3 * scale);
+            let h = 6e-6 * if typical > 0.0 { typical } else { 1.0 };
+            // A non-negative species is not pushed below zero, where rate laws
+            // with roots or logarithms are undefined: one-sided difference
+            // (−3f₀ + 4f₁ − f₂) / 2h instead, still second order.
+            let one_sided = x[s] >= 0.0 && x[s] - h < 0.0;
+            let derivative: Vec<f64> = if one_sided {
+                let f0 = self.column_rates(t, x, params);
+                xp[s] = x[s] + h;
+                let f1 = self.column_rates(t, &xp, params);
+                xp[s] = x[s] + 2.0 * h;
+                let f2 = self.column_rates(t, &xp, params);
+                (0..f0.len()).map(|c| (-3.0 * f0[c] + 4.0 * f1[c] - f2[c]) / (2.0 * h)).collect()
+            } else {
+                xp[s] = x[s] + h;
+                let up = self.column_rates(t, &xp, params);
+                xp[s] = x[s] - h;
+                let down = self.column_rates(t, &xp, params);
+                (0..up.len()).map(|c| (up[c] - down[c]) / (2.0 * h)).collect()
+            };
+            xp[s] = x[s];
+            for (c, d) in derivative.into_iter().enumerate() {
+                e[(c, s)] = d;
+            }
+        }
+        e
+    }
+
+    /// The full Jacobian `N ε` (species × species). Singular whenever there
+    /// are conservation laws; use [`Model::reduced_jacobian`] for analysis.
+    pub fn full_jacobian(&self, t: f64, x: &[f64], params: &[f64]) -> Matrix {
+        self.stoichiometry.mul(&self.elasticities(t, x, params))
+    }
+
+    /// The reduced Jacobian `J = N_R ε L` at independent species `u`.
+    pub fn reduced_jacobian(&self, t: f64, u: &[f64], totals: &[f64], params: &[f64]) -> Matrix {
+        let x = self.conservation.full_state(u, totals);
+        let n_r = Matrix::from_rows(
+            &self.conservation.independent.iter().map(|&i| self.stoichiometry.row(i).to_vec()).collect::<Vec<_>>(),
+        );
+        if n_r.rows() == 0 {
+            return Matrix::zeros(0, 0);
+        }
+        n_r.mul(&self.elasticities(t, &x, params)).mul(&self.conservation.link_matrix())
     }
 
     /// The parameters, which the UI shows as sliders.
@@ -439,8 +660,14 @@ impl Model {
     /// The run is split into segments at events: the solver integrates until a trigger
     /// becomes true, the events are applied, and the solver restarts from the new state.
     pub fn simulate(&self, t_end: f64, settings: &SolverSettings) -> Solution {
-        let mut params: Vec<f64> = self.vars.iter().map(|v| v.symbol.value).collect();
-        let mut y: Vec<f64> = self.species.iter().map(|s| s.value).collect();
+        self.simulate_from(self.initial_state(), self.parameter_values(), t_end, settings)
+    }
+
+    /// [`Model::simulate`] from a given full state and parameter values
+    /// (indexed as [`Model::parameter_values`]) rather than the model's own.
+    pub fn simulate_from(&self, y0: Vec<f64>, params: Vec<f64>, t_end: f64, settings: &SolverSettings) -> Solution {
+        let mut params = params;
+        let mut y = y0;
         let mut t = 0.0;
         let mut was_true: Vec<bool> = self.triggers(t, &y, &params);
 
@@ -755,6 +982,12 @@ enum Func {
     Sin,
     Cos,
     Tan,
+    Asin,
+    Acos,
+    Atan,
+    Sinh,
+    Cosh,
+    Tanh,
     Floor,
     Ceil,
     Pow,
@@ -773,6 +1006,12 @@ impl Func {
             "sin" => Func::Sin,
             "cos" => Func::Cos,
             "tan" => Func::Tan,
+            "asin" | "arcsin" => Func::Asin,
+            "acos" | "arccos" => Func::Acos,
+            "atan" | "arctan" => Func::Atan,
+            "sinh" => Func::Sinh,
+            "cosh" => Func::Cosh,
+            "tanh" => Func::Tanh,
             "floor" => Func::Floor,
             "ceil" => Func::Ceil,
             "pow" => Func::Pow,
@@ -854,6 +1093,12 @@ impl Expr {
                     Func::Sin => x.sin(),
                     Func::Cos => x.cos(),
                     Func::Tan => x.tan(),
+                    Func::Asin => x.asin(),
+                    Func::Acos => x.acos(),
+                    Func::Atan => x.atan(),
+                    Func::Sinh => x.sinh(),
+                    Func::Cosh => x.cosh(),
+                    Func::Tanh => x.tanh(),
                     Func::Floor => x.floor(),
                     Func::Ceil => x.ceil(),
                     Func::Pow => x.powf(args[1].eval(c)),

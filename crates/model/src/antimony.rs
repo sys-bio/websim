@@ -28,6 +28,12 @@ use crate::model::{EventStmt, ParseError, Stmt, StmtKind, is_identifier};
 pub struct Parsed {
     pub stmts: Vec<Stmt>,
     pub events: Vec<EventStmt>,
+    /// For each floating species changed by reactions, in order of first
+    /// appearance: (species, [(reaction, net stoichiometry)]). A species that
+    /// takes part only as a catalyst has an empty list. Used for conservation
+    /// analysis; the rate statements in `stmts` carry the same information
+    /// for simulation.
+    pub stoichiometry: Vec<(String, Vec<(String, f64)>)>,
 }
 
 struct Reaction {
@@ -43,6 +49,7 @@ pub fn statements(text: &str) -> Result<Parsed, ParseError> {
     let mut reactions: Vec<Reaction> = Vec::new();
     let mut boundary: Vec<String> = Vec::new();
 
+    let text = blank_block_comments(text);
     for (i, raw) in text.lines().enumerate() {
         let line = i + 1;
         let err = |message: String| ParseError { line, message };
@@ -100,6 +107,7 @@ pub fn statements(text: &str) -> Result<Parsed, ParseError> {
         }
     }
 
+    let mut stoichiometry = Vec::new();
     for (name, line, changes) in species {
         if let Some(rate_rule) = stmts.iter().find(|s| s.kind == StmtKind::Rate && s.name == name) {
             return Err(ParseError {
@@ -116,7 +124,9 @@ pub fn statements(text: &str) -> Result<Parsed, ParseError> {
             .map(|(reaction, net)| format!("({net})*{reaction}"))
             .collect();
         let rhs = if terms.is_empty() { "0".to_owned() } else { terms.join(" + ") };
-        stmts.push(Stmt { line, name, kind: StmtKind::Rate, rhs });
+        stmts.push(Stmt { line, name: name.clone(), kind: StmtKind::Rate, rhs });
+        let net: Vec<(String, f64)> = changes.into_iter().filter(|(_, n)| *n != 0.0).collect();
+        stoichiometry.push((name, net));
     }
 
     // Like Antimony, boundary species without a value start at 0.
@@ -125,7 +135,43 @@ pub fn statements(text: &str) -> Result<Parsed, ParseError> {
             stmts.push(Stmt { line: 0, name, kind: StmtKind::Assign, rhs: "0".to_owned() });
         }
     }
-    Ok(Parsed { stmts, events })
+    Ok(Parsed { stmts, events, stoichiometry })
+}
+
+/// Replace the contents of every `/* ... */` comment with spaces, keeping the
+/// line breaks so that line numbers in error messages stay right.
+fn blank_block_comments(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut chars = text.chars().peekable();
+    let mut in_comment = false;
+    while let Some(c) = chars.next() {
+        if in_comment {
+            if c == '*' && chars.peek() == Some(&'/') {
+                chars.next();
+                out.push_str("  ");
+                in_comment = false;
+            } else {
+                out.push(if c == '\n' { '\n' } else { ' ' });
+            }
+        } else if c == '/' && chars.peek() == Some(&'*') {
+            chars.next();
+            out.push_str("  ");
+            in_comment = true;
+        } else if (c == '/' && chars.peek() == Some(&'/')) || c == '#' {
+            // A line comment: copy it unchanged, so a '/*' inside it starts nothing.
+            out.push(c);
+            while let Some(&next) = chars.peek() {
+                if next == '\n' {
+                    break;
+                }
+                out.push(next);
+                chars.next();
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    out
 }
 
 /// If `text` is an event, `[name:] at trigger: target = value, ...`, parse it.
