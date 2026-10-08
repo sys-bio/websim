@@ -1,0 +1,61 @@
+# Build the web version with Trunk and publish it to GitHub Pages on every push to main.
+# One-time setup on GitHub: Settings → Pages → Source: "GitHub Actions".
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # also allow running it by hand from the Actions tab
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Don't let two deployments run at once.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+env:
+  TRUNK_VERSION: v0.21.14
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust with the WebAssembly target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache compiled dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install Trunk (prebuilt)
+        run: |
+          curl -sSL "https://github.com/trunk-rs/trunk/releases/download/${TRUNK_VERSION}/trunk-x86_64-unknown-linux-gnu.tar.gz" \
+            | tar -xz -C /usr/local/bin trunk
+          trunk --version
+
+      # Pages serves the site at https://<owner>.github.io/<repo>/, so links must start with /<repo>/.
+      - name: Build
+        run: trunk build --release --public-url "/${{ github.event.repository.name }}/"
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
