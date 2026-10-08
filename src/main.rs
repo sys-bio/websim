@@ -9,8 +9,7 @@ mod solvers;
 use std::collections::HashMap;
 
 use eframe::egui;
-use egui::epaint::CubicBezierShape;
-use egui::{Align2, Color32, FontId, Pos2, Rect, Sense, Shape, Stroke, StrokeKind, vec2};
+use egui::{Color32, vec2};
 use egui_plot::{Legend, Line, LineStyle, Plot, Points, VLine};
 use model::{EXAMPLES, Model, Results};
 use solvers::{Method, SolverSettings};
@@ -241,25 +240,9 @@ fn series_color(i: usize) -> Color32 {
     Color32::from_rgb(r, g, b)
 }
 
-/// One freehand line drawn by the user with the mouse.
-/// Points are stored relative to the canvas's top-left corner,
-/// so the drawing stays put if the window is moved or resized.
-struct PenStroke {
-    points: Vec<Pos2>,
-    stroke: Stroke,
-}
-
-/// Which page is shown in the main area.
-#[derive(Clone, Copy, PartialEq)]
-enum Tab {
-    Simulation,
-    Canvas,
-}
-
 /// All application state lives in this struct. egui is "immediate mode":
 /// `ui` is called every frame and rebuilds the whole UI from this state.
 struct MyApp {
-    tab: Tab,
     /// The model as typed by the user.
     model_text: String,
     /// The last version of the text that parsed without errors.
@@ -282,19 +265,12 @@ struct MyApp {
     /// Which quantities are plotted against each other in the phase plane.
     phase_x: usize,
     phase_y: usize,
-    name: String,
-    age: u32,
-    clicks: u32,
     dark_mode: bool,
-    color: Color32,
-    pen_width: f32,
-    pen_strokes: Vec<PenStroke>,
 }
 
 impl Default for MyApp {
     fn default() -> Self {
         Self {
-            tab: Tab::Simulation,
             model_text: EXAMPLES[0].1.to_owned(),
             model: Model::parse(EXAMPLES[0].1).ok(),
             parse_error: None,
@@ -308,13 +284,7 @@ impl Default for MyApp {
             refit_time_course: false,
             phase_x: 0,
             phase_y: 1,
-            name: "World".to_owned(),
-            age: 42,
-            clicks: 0,
             dark_mode: true,
-            color: Color32::from_rgb(100, 150, 250),
-            pen_width: 3.0,
-            pen_strokes: Vec::new(),
         }
     }
 }
@@ -342,24 +312,15 @@ impl eframe::App for MyApp {
                     }
                 });
                 ui.checkbox(&mut self.dark_mode, "Dark mode");
-                ui.separator();
-                ui.selectable_value(&mut self.tab, Tab::Simulation, "ODE simulation");
-                ui.selectable_value(&mut self.tab, Tab::Canvas, "Canvas");
             });
         });
 
         egui::Panel::left("controls")
             .resizable(true)
             .default_size(440.0)
-            .show(ui, |ui| match self.tab {
-                Tab::Simulation => self.model_controls(ui),
-                Tab::Canvas => self.controls(ui),
-            });
+            .show(ui, |ui| self.model_controls(ui));
 
-        egui::CentralPanel::default().show(ui, |ui| match self.tab {
-            Tab::Simulation => self.simulation(ui),
-            Tab::Canvas => self.canvas(ui),
-        });
+        egui::CentralPanel::default().show(ui, |ui| self.simulation(ui));
     }
 }
 
@@ -602,135 +563,6 @@ impl MyApp {
                     plot_ui.points(Points::new("Start", vec![start]).radius(5.0));
                 }
             });
-    }
-
-    /// The widgets in the left-hand side panel.
-    fn controls(&mut self, ui: &mut egui::Ui) {
-        ui.heading("Controls");
-        ui.separator();
-
-        ui.horizontal(|ui| {
-            ui.label("Your name:");
-            ui.text_edit_singleline(&mut self.name);
-        });
-
-        ui.add(egui::Slider::new(&mut self.age, 0..=120).text("age"));
-
-        if ui.button("Increment age").clicked() {
-            self.age += 1;
-        }
-
-        ui.label(format!("Hello '{}', age {}", self.name, self.age));
-        ui.separator();
-
-        ui.horizontal(|ui| {
-            if ui.button("Click me!").clicked() {
-                self.clicks += 1;
-            }
-            ui.label(format!("Clicked {} times", self.clicks));
-        });
-        ui.separator();
-
-        ui.label("Pen (drag on the canvas to draw):");
-        ui.horizontal(|ui| {
-            ui.label("Colour:");
-            ui.color_edit_button_srgba(&mut self.color);
-        });
-        ui.add(egui::Slider::new(&mut self.pen_width, 1.0..=20.0).text("width"));
-        if ui.button("Clear drawing").clicked() {
-            self.pen_strokes.clear();
-        }
-    }
-
-    /// A drawing area: some fixed shapes plus whatever the user draws.
-    fn canvas(&mut self, ui: &mut egui::Ui) {
-        // Reserve all remaining space and get a Painter that is clipped to it.
-        // Sense::drag() means we get mouse-drag events for this area.
-        let (response, painter) = ui.allocate_painter(ui.available_size(), Sense::drag());
-        let rect = response.rect;
-        let text_color = ui.visuals().text_color();
-
-        // Background and border.
-        painter.rect_filled(rect, 0.0, ui.visuals().extreme_bg_color);
-        painter.rect_stroke(
-            rect,
-            0.0,
-            ui.visuals().widgets.noninteractive.bg_stroke,
-            StrokeKind::Inside,
-        );
-
-        // Place things by fraction of the canvas size (0.0..1.0),
-        // so the drawing scales when the window is resized.
-        let at = |fx: f32, fy: f32| rect.min + vec2(fx * rect.width(), fy * rect.height());
-        let outline = Stroke::new(2.0, text_color);
-
-        // Lines: a solid one and a dashed one.
-        painter.line_segment([at(0.05, 0.10), at(0.35, 0.35)], Stroke::new(4.0, Color32::RED));
-        painter.extend(Shape::dashed_line(
-            &[at(0.05, 0.35), at(0.35, 0.10)],
-            Stroke::new(2.0, Color32::GRAY),
-            12.0,
-            6.0,
-        ));
-
-        // A rounded rectangle, filled and outlined.
-        let r = Rect::from_min_max(at(0.42, 0.10), at(0.68, 0.35));
-        painter.rect_filled(r, 10.0, Color32::from_rgb(80, 160, 90));
-        painter.rect_stroke(r, 10.0, outline, StrokeKind::Outside);
-
-        // A circle that uses the colour chosen in the side panel.
-        let radius = 0.12 * rect.width().min(rect.height());
-        painter.circle_filled(at(0.84, 0.23), radius, self.color);
-        painter.circle_stroke(at(0.84, 0.23), radius, outline);
-
-        // A filled triangle.
-        painter.add(Shape::convex_polygon(
-            vec![at(0.20, 0.50), at(0.33, 0.85), at(0.07, 0.85)],
-            Color32::from_rgb(230, 160, 40),
-            outline,
-        ));
-
-        // A smooth Bezier curve through four control points.
-        painter.add(CubicBezierShape::from_points_stroke(
-            [at(0.42, 0.85), at(0.55, 0.35), at(0.75, 1.05), at(0.95, 0.50)],
-            false,
-            Color32::TRANSPARENT,
-            Stroke::new(4.0, Color32::from_rgb(160, 90, 220)),
-        ));
-
-        painter.text(
-            at(0.5, 0.95),
-            Align2::CENTER_CENTER,
-            "Drawn with egui's Painter",
-            FontId::proportional(16.0),
-            text_color,
-        );
-
-        // Freehand drawing: start a new stroke when a drag begins,
-        // then add the mouse position to it every frame while dragging.
-        if response.drag_started() {
-            self.pen_strokes.push(PenStroke {
-                points: Vec::new(),
-                stroke: Stroke::new(self.pen_width, self.color),
-            });
-        }
-        if response.dragged() {
-            if let (Some(pos), Some(current)) =
-                (response.interact_pointer_pos(), self.pen_strokes.last_mut())
-            {
-                let p = (pos - rect.min).to_pos2();
-                if current.points.last() != Some(&p) {
-                    current.points.push(p);
-                }
-            }
-        }
-
-        for pen in &self.pen_strokes {
-            if pen.points.len() >= 2 {
-                let points = pen.points.iter().map(|p| rect.min + p.to_vec2()).collect();
-                painter.add(Shape::line(points, pen.stroke));
-            }
-        }
     }
 }
 
