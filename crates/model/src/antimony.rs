@@ -16,7 +16,7 @@
 //!
 //! Not supported (yet): event delays (`after`) and options (`t0=`, `priority=`,
 //! `persistent=`, `fromTrigger=`), functions, compartments and units, initial
-//! assignments to species, and `/* */` comments.
+//! assignments to species. Comments are `//` and `/* */`.
 //!
 //! Reactions are translated into plain statements: each reaction's rate law
 //! becomes a rule, and each floating species gets a rate equation summing
